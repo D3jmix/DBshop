@@ -1,0 +1,125 @@
+@font-face {
+  font-family: MyriadProRegular;
+  src: url("./fonts/MyriadPro-Regular.ttf");
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  font-family: MyriadProRegular, sans-serif;
+  box-sizing: border-box;
+}
+
+.background {
+  width: 100%;
+  height: 100vh;
+  background-image: linear-gradient(rgba(130, 0, 0, 0.5), rgba(0, 0, 130, 0.5));
+  background-position: center;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-box {
+  width: 90%;
+  max-width: 450px;
+  background: #fff;
+  padding: 50px 60px;
+  text-align: center;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.form-box h1 {
+  font-size: 30px;
+  margin-bottom: 30px;
+  color: #3c00a0;
+  position: relative;
+}
+
+.form-box h1::after {
+  content: "";
+  width: 30px;
+  height: 4px;
+  border-radius: 3px;
+  background: #3c00a0;
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.input-field {
+  background: #eaeaea;
+  margin: 15px 0;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  width: 100%;
+}
+
+.input-field i {
+  margin-left: 10px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 12px;
+  width: 100%;
+  color: #333;
+}
+
+label {
+  font-size: 14px;
+  color: #3c00a0;
+  margin-bottom: 5px;
+  display: block;
+  text-align: left;
+}
+
+.submit-button {
+  width: 100%;
+  background: #3c00a0;
+  color: #fff;
+  height: 45px;
+  border-radius: 20px;
+  border: 0;
+  outline: 0;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.3s ease;
+  margin-top: 15px;
+}
+
+.submit-button:hover {
+  background-color: #2a006d;
+}
+
+.error-box,
+.success-box {
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.error-box {
+  background-color: #ffdddd;
+  border-left: 6px solid #f44336;
+  color: #a94442;
+}
+
+.success-box {
+  background-color: #ddffdd;
+  border-left: 6px solid #4caf50;
+  color: #3c763d;
+}

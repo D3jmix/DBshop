@@ -1,11 +1,11 @@
 <?php
-require_once 'db.php'; 
 session_start();
-$error_mes = "";
-$success_mes = "";
+require_once 'db.php';
+
 $zalogowany = isset($_SESSION['user_id']);
 $czyAdmin = false;
-  
+$product_id = $_GET['id'] ?? ($_POST['id'] ?? null);
+
 if ($zalogowany) {
     $userId = $_SESSION['user_id'];
     $czyAdmin = false;
@@ -20,73 +20,40 @@ if ($zalogowany) {
         die("Błąd zapytania do bazy danych: " . $e->getMessage());
     }
 }
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $email = trim($_POST["email"]);
-    if (empty($email)) {
-        $error_mes = "Pole email jest wymagane.";
-    } else if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error_mes = "Wprowadź poprawny adres email.";
-    } else {
-        $stmt = $pdo->prepare("SELECT reset_token_expires, reset_token FROM konta WHERE email = :email");
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$user) {
-            $error_mes = "Nie znaleziono użytkownika z podanym adresem e-mail.";
-        }else{
-            $reset_token_expires = $user['reset_token_expires'];
-            $reset_token = $user['reset_token'];
-          
-            $now = new DateTime();
-            if ($now < new DateTime($reset_token_expires) && $reset_token) {
-                $error_mes = "Link resetujący hasło już został wysłany. Sprawdź swoją skrzynkę lub poczekaj chwilę przed ponownym wysłaniem.";
-            }else {
-            $token = bin2hex(random_bytes(32));
-            $expires_at = date("Y-m-d H:i:s", strtotime('+1 hour'));
-            
-            $stmt = $pdo->prepare("UPDATE konta SET reset_token = :token, reset_token_expires = :expires_at WHERE email = :email");
-            $stmt->bindParam(':token', $token);
-            $stmt->bindParam(':expires_at', $expires_at);
-            $stmt->bindParam(':email', $email);
-            
-            if ($stmt->execute()) {
-                if (sendPassReset($email, $token)) {
-                    $success_mes = "Link resetujący hasło został wysłany na podany email.";
-                } else {
-                    $error_mes = "Wystąpił problem podczas wysyłania wiadomości. Spróbuj ponownie później.";
-                }
-            }else{
-               $error_mes = "Nie udało się zaktualizować danych użytkownika. Spróbuj ponownie później.";
-            }
-        }
-     }
-   }
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['wyloguj'])) {
+    session_destroy();
+    header("Location: index.php");
+    exit;
 }
-
-function sendPassReset($email, $token) {
-    $subject = "Resetowanie hasła";
-    $resetLink = "https://dejmix.ct8.pl/reset_passw.php?token=" . urlencode($token);
-    $message = "Kliknij poniższy link, aby zresetować hasło (ważny przez 1 godzinę): \n\n" . $resetLink;
-    $headers = "From: djshopdb@dejmix.ct8.pl\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-
-    return mail($email, $subject, $message, $headers);
-  }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Przypomnij hasło</title>
+    <title>Panel użytkownika</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles/lostPasw.css"/>
-    <script src="https://kit.fontawesome.com/0811bb0147.js" crossorigin="anonymous"></script>
     <style>
-      .wyloguj-btn {
+        .sidebar {
+            min-height: 100vh;
+            border-right: 1px solid #ddd;
+        }
+        .sidebar a {
+            display: block;
+            padding: 10px 15px;
+            text-decoration: none;
+            color: #333;
+        }
+        .sidebar a:hover {
+            background-color: #f8f9fa;
+        }
+        .content {
+            padding: 20px;
+        }
+        .wyloguj-btn {
         background-color: orange;
         color: white;
         border: none;
@@ -101,10 +68,10 @@ function sendPassReset($email, $token) {
         background-color: red;
         color: white;
       }
-      </style>
+    </style>
 </head>
 <body>
-  <header class="bg-dark text-white py-3">
+   <header class="bg-dark text-white py-3">
         <div class="container d-flex justify-content-between align-items-center">
             <a href="index.php" class="text-white text-decoration-none fs-4"><img src="/photos/logo.png" alt="DB shop" width="70px" height="70px"></a>
             <nav class="mx-auto">
@@ -152,24 +119,46 @@ function sendPassReset($email, $token) {
           </div>
       </div>
   </header>
-    <div class="background">
-        <div class="form-box">
-            <h1>Przypomnij hasło</h1>
-            <?php if ($error_mes): ?>
-                <div class="error-box"><p><?php echo $error_mes; ?></p></div>
-            <?php elseif ($success_mes): ?>
-                <div class="success-box"><p><?php echo $success_mes; ?></p></div>
-            <?php endif; ?>
-            <form action="LostPasw.php" method="POST">
-                <div class="input-field">
-                    <i class="fa-solid fa-envelope"></i>
-                    <input type="email" name="email" placeholder="Podaj swój email" required>
-                </div>
-                <button type="submit" class="submit-button">Wyślij Email</button>
-            </form>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 sidebar bg-light">
+                <h5 class="text-center py-3">Opcje</h5>
+                <a href="?page=dane-osobowe">Dane osobowe</a>
+                <a href="?page=adresy">Adresy</a>
+                <a href="?page=platnosci">Płatności</a>
+                <a href="?page=pomoc">Pomoc i wsparcie</a>
+                <a href="?page=zarzadzanie-kontem">Zarządzanie kontem</a>
+            </div>
+            <div class="col-md-9 content">
+                <?php
+                if (isset($_GET['page'])) {
+                    switch ($_GET['page']) {
+                        case 'dane-osobowe':
+                            include 'panel/dane_osobowe.php';
+                            break;
+                        case 'adresy':
+                            include 'panel/adresy.php';
+                            break;
+                        case 'platnosci':
+                            include 'panel/platnosci.php';
+                            break;
+                        case 'pomoc':
+                            include 'panel/pomoc.php';
+                            break;
+                        case 'zarzadzanie-kontem':
+                            include 'panel/zarzadzanie_kontem.php';
+                            break;
+                        default:
+                            echo "<p class='text-center text-muted'>Wybierz jedną z opcji z menu.</p>";
+                    }
+                } else {
+                    echo "<p class='text-center text-muted'>Wybierz jedną z opcji z menu.</p>";
+                }
+                ?>
+            </div>
         </div>
     </div>
-  <footer class="bg-dark text-white py-4">
+    <footer class="bg-dark text-white py-4">
     <div class="container text-center">
         <p>&copy; 2024 DBShop. Wszystkie prawa zastrzeżone.</p>
         <div class="row">
@@ -183,9 +172,18 @@ function sendPassReset($email, $token) {
         </div>
     </div>
 </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </html>
+
+
+
+
+
+
+
+
 
 
 

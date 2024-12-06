@@ -1,0 +1,81 @@
+@font-face {
+  font-family: MyriadProRegular;
+  src: url(".fonts/MyriadPro-Regular.ttf");
+}
+* {
+  margin: 0;
+  padding: 0;
+  font-family: MyriadProRegular;
+  box-sizing: border-box;
+}
+.background {
+  width: 100%;
+  height: 100vh;
+  background-image: linear-gradient(rgba(130, 0, 0, 0.5), rgba(0, 0, 130, 0.5));
+  background-position: center;
+  background-size: cover;
+  position: relative;
+}
+.form-box {
+  width: 90%;
+  max-width: 450px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  padding: 50px 60px 60px;
+  text-align: center;
+}
+.form-box h1 {
+  font-size: 30px;
+  margin-bottom: 40px;
+  color: #3c00a0;
+}
+.input-field {
+  background: #eaeaea;
+  margin: 15px 0;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.input-field i {
+  margin-left: 15px;
+  color: #999;
+  flex-shrink: 0;
+}
+input {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 18px 15px;
+  width: 100%;
+}
+.submit-button {
+  background: #3c00a0;
+  color: #fff;
+  margin-top: 15px;
+  height: 40px;
+  width: 60%;
+  border-radius: 20px;
+  border: 0;
+  cursor: pointer;
+}
+.submit-button:hover {
+  background-color: #2a006d;
+}
+.error-box {
+  background-color: #ffdddd;
+  color: #a94442;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+}
+.success-box {
+  background-color: #ddffdd;
+  color: #3c763d;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+}

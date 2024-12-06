@@ -1,11 +1,7 @@
-@font-face {
-  font-family: MyriadProRegular;
-  src: url(".fonts/MyriadPro-Regular.ttf");
-}
-* {
+* { 
   margin: 0px;
   padding: 0px;
-  font-family: MyriadProRegular;
+  font-family: 'Arial', sans-serif;
   box-sizing: border-box;
 }
 
@@ -21,7 +17,7 @@
 .form-box {
   width: 90%;
   max-width: 450px;
-  height: 615px;
+  height: 750px;
   position: absolute;
   top: 50%;
   left: 50%;
@@ -29,6 +25,17 @@
   background: #fff;
   padding: 50px 60px 60px;
   text-align: center;
+  margin: 10px
+}
+
+.form-box.login {
+  height: 570px;
+  transition: height 0.5s ease-in-out
+}
+
+.form-box.register {
+  height: 970px;
+  transition: height 0.5s ease-in-out;
 }
 
 .form-box h1 {
@@ -117,13 +124,16 @@ form p a {
   outline: 0;
   cursor: pointer;
 }
-
+#zatwierdz {
+  border-top-left-radius: 20px;
+  border-bottom-left-radius: 20px;
+}
 .submit-button:hover {
   background-color: #2a006d;
 }
 
 #zapomnialem {
-  width: 35%;
+  width: 45%;
   float: right;
 }
 
@@ -165,4 +175,9 @@ form p a {
 .buttons button.disable {
   background: #eaeaea;
   color: #555;
-} /*# sourceMappingURL=login.css.map */
+}
+
+
+
+
+

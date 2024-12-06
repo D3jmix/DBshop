@@ -1,8 +1,7 @@
 <?php
-require_once 'db.php'; 
 session_start();
-$error_mes = "";
-$success_mes = "";
+require_once 'db.php';
+
 $zalogowany = isset($_SESSION['user_id']);
 $czyAdmin = false;
   
@@ -20,59 +19,54 @@ if ($zalogowany) {
         die("Błąd zapytania do bazy danych: " . $e->getMessage());
     }
 }
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $email = trim($_POST["email"]);
-    if (empty($email)) {
-        $error_mes = "Pole email jest wymagane.";
-    } else if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error_mes = "Wprowadź poprawny adres email.";
-    } else {
-        $stmt = $pdo->prepare("SELECT reset_token_expires, reset_token FROM konta WHERE email = :email");
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$user) {
-            $error_mes = "Nie znaleziono użytkownika z podanym adresem e-mail.";
-        }else{
-            $reset_token_expires = $user['reset_token_expires'];
-            $reset_token = $user['reset_token'];
-          
-            $now = new DateTime();
-            if ($now < new DateTime($reset_token_expires) && $reset_token) {
-                $error_mes = "Link resetujący hasło już został wysłany. Sprawdź swoją skrzynkę lub poczekaj chwilę przed ponownym wysłaniem.";
-            }else {
-            $token = bin2hex(random_bytes(32));
-            $expires_at = date("Y-m-d H:i:s", strtotime('+1 hour'));
-            
-            $stmt = $pdo->prepare("UPDATE konta SET reset_token = :token, reset_token_expires = :expires_at WHERE email = :email");
-            $stmt->bindParam(':token', $token);
-            $stmt->bindParam(':expires_at', $expires_at);
-            $stmt->bindParam(':email', $email);
-            
-            if ($stmt->execute()) {
-                if (sendPassReset($email, $token)) {
-                    $success_mes = "Link resetujący hasło został wysłany na podany email.";
-                } else {
-                    $error_mes = "Wystąpił problem podczas wysyłania wiadomości. Spróbuj ponownie później.";
-                }
-            }else{
-               $error_mes = "Nie udało się zaktualizować danych użytkownika. Spróbuj ponownie później.";
-            }
-        }
-     }
-   }
+
+if (isset($_GET['kategoria']) && is_numeric($_GET['kategoria'])) {
+    $kategoria_id = $_GET['kategoria'];
+} else {
+    $kategoria_id = 1;
 }
 
-function sendPassReset($email, $token) {
-    $subject = "Resetowanie hasła";
-    $resetLink = "https://dejmix.ct8.pl/reset_passw.php?token=" . urlencode($token);
-    $message = "Kliknij poniższy link, aby zresetować hasło (ważny przez 1 godzinę): \n\n" . $resetLink;
-    $headers = "From: djshopdb@dejmix.ct8.pl\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+$stmt = $pdo->prepare("SELECT nazwa FROM Kategorie WHERE id_kategorii = :kategoria_id");
+$stmt->bindValue(':kategoria_id', $kategoria_id, PDO::PARAM_INT);
+$stmt->execute();
+$kategoria = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    return mail($email, $subject, $message, $headers);
-  }
+if (!$kategoria) {
+    header("Location: kategoria_wybor.php");
+    exit;
+}
+
+$query = "SELECT p.id, p.nazwa, p.cena, p.zdjecie FROM produkty p JOIN kategorie_k kk ON p.id = kk.id_produktu WHERE kk.id_kategorii = :kategoria_id";
+  
+if (isset($_GET['maxCena']) && is_numeric($_GET['maxCena'])) {
+    $max_cena = $_GET['maxCena'];
+    $query .= " AND p.cena <= :max_cena";
+}
+
+if (isset($_GET['sortBy'])) {
+    if ($_GET['sortBy'] == 'priceAsc') {
+        $query .= " ORDER BY p.cena ASC";
+    } elseif ($_GET['sortBy'] == 'priceDesc') {
+        $query .= " ORDER BY p.cena DESC";
+    }
+}
+
+$stmt = $pdo->prepare($query);
+
+$stmt->bindValue(':kategoria_id', $kategoria_id, PDO::PARAM_INT);
+
+if (isset($max_cena)) {
+    $stmt->bindValue(':max_cena', $max_cena, PDO::PARAM_INT);
+}
+
+$stmt->execute();
+$produkty = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['wyloguj'])) {
+    session_destroy();
+    header("Location: index.php");
+    exit;
+}
 ?>
 
 <!DOCTYPE html>
@@ -80,11 +74,9 @@ function sendPassReset($email, $token) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Przypomnij hasło</title>
+    <title>Kategoria: <?= htmlspecialchars($kategoria['nazwa']) ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles/lostPasw.css"/>
-    <script src="https://kit.fontawesome.com/0811bb0147.js" crossorigin="anonymous"></script>
     <style>
       .wyloguj-btn {
         background-color: orange;
@@ -102,9 +94,10 @@ function sendPassReset($email, $token) {
         color: white;
       }
       </style>
+
 </head>
 <body>
-  <header class="bg-dark text-white py-3">
+   <header class="bg-dark text-white py-3">
         <div class="container d-flex justify-content-between align-items-center">
             <a href="index.php" class="text-white text-decoration-none fs-4"><img src="/photos/logo.png" alt="DB shop" width="70px" height="70px"></a>
             <nav class="mx-auto">
@@ -152,24 +145,59 @@ function sendPassReset($email, $token) {
           </div>
       </div>
   </header>
-    <div class="background">
-        <div class="form-box">
-            <h1>Przypomnij hasło</h1>
-            <?php if ($error_mes): ?>
-                <div class="error-box"><p><?php echo $error_mes; ?></p></div>
-            <?php elseif ($success_mes): ?>
-                <div class="success-box"><p><?php echo $success_mes; ?></p></div>
-            <?php endif; ?>
-            <form action="LostPasw.php" method="POST">
-                <div class="input-field">
-                    <i class="fa-solid fa-envelope"></i>
-                    <input type="email" name="email" placeholder="Podaj swój email" required>
+    <section class="py-5 bg-light">
+        <div class="container text-center">
+            <h1 class="fw-bold">Kategoria: <?= htmlspecialchars($kategoria['nazwa']) ?></h1>
+            <p class="text-muted">Znajdź najlepsze produkty w tej kategorii.</p>
+        </div>
+    </section>
+
+    <section class="py-3">
+        <div class="container">
+            <form class="row g-3" method="GET" action="">
+                <input type="hidden" name="kategoria" value="<?= $kategoria_id ?>">
+
+                <div class="col-md-4">
+                    <label for="sortBy" class="form-label">Sortuj według:</label>
+                    <select id="sortBy" name="sortBy" class="form-select">
+                        <option value="priceAsc" <?= isset($_GET['sortBy']) && $_GET['sortBy'] == 'priceAsc' ? 'selected' : '' ?>>Cena: od najniższej</option>
+                        <option value="priceDesc" <?= isset($_GET['sortBy']) && $_GET['sortBy'] == 'priceDesc' ? 'selected' : '' ?>>Cena: od najwyższej</option>
+                    </select>
                 </div>
-                <button type="submit" class="submit-button">Wyślij Email</button>
+                
+                <div class="col-md-4">
+                    <label for="priceRange" class="form-label">Zakres cen:</label>
+                    <input type="range" id="priceRange" name="maxCena" class="form-range" min="0" max="10000" step="100" value="<?= isset($_GET['maxCena']) ? $_GET['maxCena'] : 10000 ?>">
+                    <p class="small text-muted">Maksymalna cena: <span id="priceValue"><?= isset($_GET['maxCena']) ? $_GET['maxCena'] : 10000 ?> zł</span></p>
+                </div>
+                
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">Filtruj</button>
+                </div>
             </form>
         </div>
-    </div>
-  <footer class="bg-dark text-white py-4">
+    </section>
+
+    <section class="py-5">
+        <div class="container">
+            <div class="row g-4">
+                <?php foreach ($produkty as $produkt): ?>
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <img src="<?= htmlspecialchars($produkt['zdjecie']) ?>" class="card-img-top" alt="<?= htmlspecialchars($produkt['nazwa']) ?>">
+                            <div class="card-body d-flex flex-column text-center">
+                                <h5 class="card-title"><?= htmlspecialchars($produkt['nazwa']) ?></h5>
+                                <p class="card-text">Cena: <?= number_format($produkt['cena'], 2, ',', ' ') ?> zł</p>
+                                <a href="produkt_strona.php?id=<?= $produkt['id'] ?>" class="btn btn-primary">Zobacz szczegóły</a>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-dark text-white py-4">
     <div class="container text-center">
         <p>&copy; 2024 DBShop. Wszystkie prawa zastrzeżone.</p>
         <div class="row">
@@ -183,9 +211,30 @@ function sendPassReset($email, $token) {
         </div>
     </div>
 </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('priceRange').addEventListener('input', function() {
+            document.getElementById('priceValue').innerText = this.value + ' zł';
+        });
+    </script>
 </body>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

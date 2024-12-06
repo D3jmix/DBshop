@@ -1,10 +1,11 @@
 <?php
-require_once 'db.php'; 
 session_start();
-$error_mes = "";
-$success_mes = "";
+require_once 'db.php';
+
 $zalogowany = isset($_SESSION['user_id']);
 $czyAdmin = false;
+$errorMessage = '';
+$successMessage = '';
   
 if ($zalogowany) {
     $userId = $_SESSION['user_id'];
@@ -20,71 +21,72 @@ if ($zalogowany) {
         die("Błąd zapytania do bazy danych: " . $e->getMessage());
     }
 }
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $email = trim($_POST["email"]);
-    if (empty($email)) {
-        $error_mes = "Pole email jest wymagane.";
-    } else if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error_mes = "Wprowadź poprawny adres email.";
-    } else {
-        $stmt = $pdo->prepare("SELECT reset_token_expires, reset_token FROM konta WHERE email = :email");
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['wyloguj'])) {
+    session_destroy();
+    header("Location: index.php");
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['numer_zamowienia'], $_POST['produkt'], $_POST['opis_reklamacji'])) {
         
-        if (!$user) {
-            $error_mes = "Nie znaleziono użytkownika z podanym adresem e-mail.";
-        }else{
-            $reset_token_expires = $user['reset_token_expires'];
-            $reset_token = $user['reset_token'];
-          
-            $now = new DateTime();
-            if ($now < new DateTime($reset_token_expires) && $reset_token) {
-                $error_mes = "Link resetujący hasło już został wysłany. Sprawdź swoją skrzynkę lub poczekaj chwilę przed ponownym wysłaniem.";
-            }else {
-            $token = bin2hex(random_bytes(32));
-            $expires_at = date("Y-m-d H:i:s", strtotime('+1 hour'));
-            
-            $stmt = $pdo->prepare("UPDATE konta SET reset_token = :token, reset_token_expires = :expires_at WHERE email = :email");
-            $stmt->bindParam(':token', $token);
-            $stmt->bindParam(':expires_at', $expires_at);
-            $stmt->bindParam(':email', $email);
-            
-            if ($stmt->execute()) {
-                if (sendPassReset($email, $token)) {
-                    $success_mes = "Link resetujący hasło został wysłany na podany email.";
-                } else {
-                    $error_mes = "Wystąpił problem podczas wysyłania wiadomości. Spróbuj ponownie później.";
+        $numer_zamowienia = $_POST['numer_zamowienia'];
+        $produkt = $_POST['produkt'];
+        $opis_reklamacji = $_POST['opis_reklamacji'];
+        
+        $zdjecia = [];
+        if (isset($_FILES['zdjecia'])) {
+            foreach ($_FILES['zdjecia']['tmp_name'] as $key => $tmp_name) {
+                $file_name = $_FILES['zdjecia']['name'][$key];
+                $file_tmp = $_FILES['zdjecia']['tmp_name'][$key];
+                $file_type = $_FILES['zdjecia']['type'][$key];
+                
+                $upload_dir = 'uploads/';
+                $upload_file = $upload_dir . basename($file_name);
+                
+                if (move_uploaded_file($file_tmp, $upload_file)) {
+                    $zdjecia[] = $upload_file;
                 }
-            }else{
-               $error_mes = "Nie udało się zaktualizować danych użytkownika. Spróbuj ponownie później.";
             }
         }
-     }
-   }
+        
+        $message = "Numer zamówienia: $numer_zamowienia\n";
+        $message .= "Nazwa produktu: $produkt\n";
+        $message .= "Opis reklamacji:\n$opis_reklamacji\n";
+        
+        if (!empty($zdjecia)) {
+            $message .= "\nZałączone zdjęcia:\n";
+            foreach ($zdjecia as $zdjecie) {
+                $message .= $zdjecie . "\n";
+            }
+        }
+        
+        $from = 'dejmix@dejmix.ct8.pl';
+        $to = 'djshopdb@dejmix.ct8.pl';
+        
+        $subject = "Reklamacja produktu: $produkt";
+        
+        $headers = "From: $from\r\n";
+        $headers .= "Reply-To: $from\r\n";
+        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        
+        if (mail($to, $subject, $message, $headers)) {
+            $successMessage = "Reklamacja została wysłana pomyślnie.";
+        } else {
+             $errorMessage = "Wystąpił błąd podczas wysyłania reklamacji.";
+        }
+    } else {
+       $errorMessage = "Proszę wypełnić wszystkie wymagane pola.";
+    }
 }
-
-function sendPassReset($email, $token) {
-    $subject = "Resetowanie hasła";
-    $resetLink = "https://dejmix.ct8.pl/reset_passw.php?token=" . urlencode($token);
-    $message = "Kliknij poniższy link, aby zresetować hasło (ważny przez 1 godzinę): \n\n" . $resetLink;
-    $headers = "From: djshopdb@dejmix.ct8.pl\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-
-    return mail($email, $subject, $message, $headers);
-  }
 ?>
-
 <!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Przypomnij hasło</title>
+    <title>Formularz reklamacji</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles/lostPasw.css"/>
-    <script src="https://kit.fontawesome.com/0811bb0147.js" crossorigin="anonymous"></script>
     <style>
       .wyloguj-btn {
         background-color: orange;
@@ -152,24 +154,48 @@ function sendPassReset($email, $token) {
           </div>
       </div>
   </header>
-    <div class="background">
-        <div class="form-box">
-            <h1>Przypomnij hasło</h1>
-            <?php if ($error_mes): ?>
-                <div class="error-box"><p><?php echo $error_mes; ?></p></div>
-            <?php elseif ($success_mes): ?>
-                <div class="success-box"><p><?php echo $success_mes; ?></p></div>
-            <?php endif; ?>
-            <form action="LostPasw.php" method="POST">
-                <div class="input-field">
-                    <i class="fa-solid fa-envelope"></i>
-                    <input type="email" name="email" placeholder="Podaj swój email" required>
+  
+    <main class="py-5">
+        <div class="container">
+            <h1 class="text-center mb-4">Formularz reklamacji</h1>
+            <p class="lead text-center">Proszę uzupełnić poniższy formularz, aby zgłosić reklamację produktu.</p>
+
+             <?php if ($errorMessage): ?>
+                <div class="alert alert-danger" role="alert">
+                    <?php echo $errorMessage; ?>
                 </div>
-                <button type="submit" class="submit-button">Wyślij Email</button>
+            <?php endif; ?>
+
+            <?php if ($successMessage): ?>
+                <div class="alert alert-success" role="alert">
+                    <?php echo $successMessage; ?>
+                </div>
+            <?php endif; ?>
+          
+            <form method="POST" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="numer_zamowienia" class="form-label">Numer zamówienia</label>
+                    <input type="text" class="form-control" id="numer_zamowienia" name="numer_zamowienia" required>
+                </div>
+                <div class="mb-3">
+                    <label for="produkt" class="form-label">Nazwa produktu</label>
+                    <input type="text" class="form-control" id="produkt" name="produkt" required>
+                </div>
+                <div class="mb-3">
+                    <label for="opis_reklamacji" class="form-label">Opis reklamacji</label>
+                    <textarea class="form-control" id="opis_reklamacji" name="opis_reklamacji" rows="5" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="zdjecia" class="form-label">Załącz zdjęcia (opcjonalnie)</label>
+                    <input type="file" class="form-control" id="zdjecia" name="zdjecia[]" multiple>
+                    <small class="form-text text-muted">Możesz załączyć zdjęcia uszkodzonego produktu.</small>
+                </div>
+                <button type="submit" class="btn btn-primary">Wyślij reklamację</button>
             </form>
         </div>
-    </div>
-  <footer class="bg-dark text-white py-4">
+    </main>
+
+    <footer class="bg-dark text-white py-4">
     <div class="container text-center">
         <p>&copy; 2024 DBShop. Wszystkie prawa zastrzeżone.</p>
         <div class="row">
@@ -183,9 +209,12 @@ function sendPassReset($email, $token) {
         </div>
     </div>
 </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </html>
+
+
 
 
 

@@ -1,10 +1,9 @@
 <?php
-require_once 'db.php'; 
 session_start();
-$error_mes = "";
-$success_mes = "";
+require_once 'db.php';
+
 $zalogowany = isset($_SESSION['user_id']);
-$czyAdmin = false;
+$isAdmin = false;
   
 if ($zalogowany) {
     $userId = $_SESSION['user_id'];
@@ -20,73 +19,61 @@ if ($zalogowany) {
         die("Błąd zapytania do bazy danych: " . $e->getMessage());
     }
 }
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $email = trim($_POST["email"]);
-    if (empty($email)) {
-        $error_mes = "Pole email jest wymagane.";
-    } else if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error_mes = "Wprowadź poprawny adres email.";
-    } else {
-        $stmt = $pdo->prepare("SELECT reset_token_expires, reset_token FROM konta WHERE email = :email");
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$user) {
-            $error_mes = "Nie znaleziono użytkownika z podanym adresem e-mail.";
-        }else{
-            $reset_token_expires = $user['reset_token_expires'];
-            $reset_token = $user['reset_token'];
-          
-            $now = new DateTime();
-            if ($now < new DateTime($reset_token_expires) && $reset_token) {
-                $error_mes = "Link resetujący hasło już został wysłany. Sprawdź swoją skrzynkę lub poczekaj chwilę przed ponownym wysłaniem.";
-            }else {
-            $token = bin2hex(random_bytes(32));
-            $expires_at = date("Y-m-d H:i:s", strtotime('+1 hour'));
-            
-            $stmt = $pdo->prepare("UPDATE konta SET reset_token = :token, reset_token_expires = :expires_at WHERE email = :email");
-            $stmt->bindParam(':token', $token);
-            $stmt->bindParam(':expires_at', $expires_at);
-            $stmt->bindParam(':email', $email);
-            
-            if ($stmt->execute()) {
-                if (sendPassReset($email, $token)) {
-                    $success_mes = "Link resetujący hasło został wysłany na podany email.";
-                } else {
-                    $error_mes = "Wystąpił problem podczas wysyłania wiadomości. Spróbuj ponownie później.";
-                }
-            }else{
-               $error_mes = "Nie udało się zaktualizować danych użytkownika. Spróbuj ponownie później.";
-            }
-        }
-     }
-   }
+
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['wyloguj'])) {
+    session_destroy();
+    header('Location: index.php');
+    exit;
 }
 
-function sendPassReset($email, $token) {
-    $subject = "Resetowanie hasła";
-    $resetLink = "https://dejmix.ct8.pl/reset_passw.php?token=" . urlencode($token);
-    $message = "Kliknij poniższy link, aby zresetować hasło (ważny przez 1 godzinę): \n\n" . $resetLink;
-    $headers = "From: djshopdb@dejmix.ct8.pl\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['name'], $_POST['email'], $_POST['message'])) {
+        $name = htmlspecialchars($_POST['name']);
+        $email = filter_var($_POST['email'], FILTER_VALIDATE_EMAIL);
+        $message = htmlspecialchars($_POST['message']);
 
-    return mail($email, $subject, $message, $headers);
-  }
+        if (!$email) {
+            header('Location: kontakt.php?status=invalid_email');
+            exit;
+        }
+      
+        $to = 'djshopdb@dejmix.ct8.pl';
+        $subject = 'Nowa wiadomość kontaktowa z formularza';
+
+        $emailMessage = "Imię i nazwisko: $name\n";
+        $emailMessage .= "Email: $email\n\n";
+        $emailMessage .= "Wiadomość:\n$message";
+
+        $headers = "From: dejmix@dejmix.ct8.pl\r\n";
+        $headers .= "Reply-To: $email\r\n";
+        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+      
+        if (mail($to, $subject, $emailMessage, $headers)) {
+            header('Location: kontakt.php?status=ok');
+            exit;
+        } else {
+            header('Location: kontakt.php?status=error');
+            exit;
+        }
+    }
+}
 ?>
-
 <!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Przypomnij hasło</title>
+    <title>Kontakt</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles/lostPasw.css"/>
-    <script src="https://kit.fontawesome.com/0811bb0147.js" crossorigin="anonymous"></script>
     <style>
-      .wyloguj-btn {
+        iframe {
+            border: 0;
+            width: 100%;
+            height: 400px;
+        }
+        .wyloguj-btn {
         background-color: orange;
         color: white;
         border: none;
@@ -101,10 +88,10 @@ function sendPassReset($email, $token) {
         background-color: red;
         color: white;
       }
-      </style>
+    </style>
 </head>
 <body>
-  <header class="bg-dark text-white py-3">
+    <header class="bg-dark text-white py-3">
         <div class="container d-flex justify-content-between align-items-center">
             <a href="index.php" class="text-white text-decoration-none fs-4"><img src="/photos/logo.png" alt="DB shop" width="70px" height="70px"></a>
             <nav class="mx-auto">
@@ -152,24 +139,53 @@ function sendPassReset($email, $token) {
           </div>
       </div>
   </header>
-    <div class="background">
-        <div class="form-box">
-            <h1>Przypomnij hasło</h1>
-            <?php if ($error_mes): ?>
-                <div class="error-box"><p><?php echo $error_mes; ?></p></div>
-            <?php elseif ($success_mes): ?>
-                <div class="success-box"><p><?php echo $success_mes; ?></p></div>
-            <?php endif; ?>
-            <form action="LostPasw.php" method="POST">
-                <div class="input-field">
-                    <i class="fa-solid fa-envelope"></i>
-                    <input type="email" name="email" placeholder="Podaj swój email" required>
-                </div>
-                <button type="submit" class="submit-button">Wyślij Email</button>
-            </form>
+
+  <section class="py-5">
+    <div class="container">
+      <h1 class="fw-bold text-center mb-4">Kontakt z nami</h1>
+      
+      <?php if (isset($_GET['status'])): ?>
+      <?php if ($_GET['status'] == 'ok'): ?>
+      <div class="alert alert-success" role="alert">
+        Wiadomość została pomyślnie wysłana! Dziękujemy za kontakt.
+      </div>
+      <?php elseif ($_GET['status'] == 'error'): ?>
+      <div class="alert alert-danger" role="alert">
+        Wystąpił błąd podczas wysyłania wiadomości. Spróbuj ponownie.
+      </div>
+      <?php endif; ?>
+      <?php endif; ?>
+      
+      <div class="row">
+        <div class="col-md-6">
+          <h3>Formularz kontaktowy</h3>
+          <form method="POST">
+            <div class="mb-3">
+              <label for="name" class="form-label">Imię i nazwisko</label>
+              <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+            <div class="mb-3">
+              <label for="email" class="form-label">Email</label>
+              <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+              <label for="message" class="form-label">Wiadomość</label>
+              <textarea class="form-control" id="message" name="message" rows="5" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Wyślij wiadomość</button>
+          </form>
         </div>
-    </div>
-  <footer class="bg-dark text-white py-4">
+                <div class="col-md-6">
+                    <h3>Nasze dane kontaktowe</h3>
+                    <p><strong>Adres:</strong> ul. Prosta 123, 00-001 Warszawa, Polska</p>
+                    <p><strong>Email:</strong> djshopdb@dejmix.ct8.pl </p>
+                    <p><strong>Telefon:</strong> +48 123 456 789</p>
+                </div>
+            </div>
+        </div>
+    </section>
+        
+    <footer class="bg-dark text-white py-4">
     <div class="container text-center">
         <p>&copy; 2024 DBShop. Wszystkie prawa zastrzeżone.</p>
         <div class="row">
@@ -183,10 +199,10 @@ function sendPassReset($email, $token) {
         </div>
     </div>
 </footer>
-</body>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</html>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
 
 
 
