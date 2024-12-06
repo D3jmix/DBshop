@@ -9,6 +9,7 @@ if(isset($_POST["submit"])) {
     $action = $_POST['action'];
     $emailOrUser = $_POST['emailOrUser'];
     $password = $_POST['password'];
+    $confirm_password = $_POST["confirm_password"];
 
     if ($action === "register"){
         $username = $_POST['username'];
@@ -33,22 +34,26 @@ if(isset($_POST["submit"])) {
                $error_mes = "Ten email jest już przypisany do innego konta. Wybierz inny adres email.";
             } elseif ($userExists > 0) {
                $error_mes = "Ta nazwa użytkownika jest już zajęta. Wybierz inną nazwę użytkownika.";
-            } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*?\/])[A-Za-z\d!@#$%^&*?\/]{8,}$/', $password)) {
-               $error_mes = "Hasło musi być dłuższe niż 8 znaków. Musi zawierać conajmniej jedną dużą i jedną małą literę, jedną cyfrę i jeden znak specjalny.";
+            } elseif (empty($password) || empty($confirm_password)) {
+               $error_mes = "Oba pola hasła są wymagane.";
+            }elseif ($password !== $confirm_password){
+               $error_mes = "Hasła muszą być identyczne.";
+            }elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/', $password)) {
+               $error_mes = "Hasło musi mieć co najmniej 8 znaków, zawierać małą i dużą literę, cyfrę oraz znak specjalny.";
             } else {
-                $hashed = password_hash($password, PASSWORD_BCRYPT);
-                $input = $pdo->prepare("INSERT INTO users (username, email, password) VALUES(:username, :email, :password)");
-                $input->bindValue(':username', $username, PDO::PARAM_STR);
-                $input->bindValue(':email', $email, PDO::PARAM_STR);
-                $input->bindValue(':password', $hashed, PDO::PARAM_STR);
-                $exec = $input->execute();
-                if ($exec) {
+               $hashed = password_hash($password, PASSWORD_BCRYPT);
+               $input = $pdo->prepare("INSERT INTO users (username, email, password) VALUES(:username, :email, :password)");
+               $input->bindValue(':username', $username, PDO::PARAM_STR);
+               $input->bindValue(':email', $email, PDO::PARAM_STR);
+               $input->bindValue(':password', $hashed, PDO::PARAM_STR);
+               $exec = $input->execute();
+               if ($exec) {
                    $success_mes = "Pomyślnie zarejestrowano!!";
-                } else {
+               } else {
                    $error_mes = "Wystąpił błąd. Spróbuj ponownie.";
-                }
+               }
             }
-        }
+          }
     } elseif ($action === "login") {
         if (empty($emailOrUser) || empty($password)) {
            $error_mes = "Wszystkie pola muszą być wypełnione!!";
@@ -68,7 +73,7 @@ if(isset($_POST["submit"])) {
                 $_SESSION['username'] = $user['username'];
                 $success_mes = "Udane logowanie. Witaj, " . htmlspecialchars($user['username']) . "!";
             } else {
-               $error_mes = "Błędny email/username lub hasło.";
+               $error_mes = "Błędny email/nick lub hasło.";
             }
         }
     }
@@ -99,17 +104,17 @@ if(isset($_POST["submit"])) {
                 </div>
             <?php endif; ?>
 
-            <h1 id="title">Sign up</h1>
+            <h1 id="title">Rejestracja</h1>
             <div class="buttons">
-                <button type="button" id="signUpButton">Sign up</button>
-                <button type="button" class="disable" id="signInButton">Sign in</button>
+                <button type="button" class="disable" id="signInButton">Logowanie</button>
+                <button type="button" id="signUpButton">Rejestracja</button>
             </div>
                 <form method="post">
-                    <input type="hidden" name="action" id="formAction" value="register"/>
+                    <input type="hidden" name="action" id="formAction" value="login"/>
                     <div class="input-group">
                         <div class="input-field" id="nameField">
                             <i class="fa-solid fa-user"></i>
-                            <input type="text" name="username" placeholder="Username"/>
+                            <input type="text" name="username" placeholder="Nick"/>
                         </div>
                         <div class="input-field" id="emailField">
                             <i class="fa-solid fa-envelope"></i>
@@ -117,13 +122,17 @@ if(isset($_POST["submit"])) {
                         </div>
                         <div class="input-field" id="emailOrUserField" style="display: none;">
                             <i class="fa-solid fa-user"></i>
-                            <input type="text" name="emailOrUser" placeholder="Email or Username"/>
+                            <input type="text" name="emailOrUser" placeholder="Email lub nick"/>
                         </div>
                         <div class="input-field">
                             <i class="fa-solid fa-lock"></i>
-                            <input type="password" name="password" placeholder="Password"/>
+                            <input type="password" name="password" id="password" placeholder="Hasło"/>
                         </div>
-                        <button name="submit" class="submit-button">Submit</button>
+                      <div class="input-field" id="passwAgain">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" name="confirm_password" placeholder="Potwierdź hasło">
+                      </div>
+                        <button name="submit" class="submit-button">Zatwierdź</button>
                     </div>
                 </form>            
             <div id="LostPasw">
@@ -136,3 +145,5 @@ if(isset($_POST["submit"])) {
     <script src="scripts/login.js"></script>
 </body>
 </html>
+
+
